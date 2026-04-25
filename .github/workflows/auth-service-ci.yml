@@ -28,7 +28,7 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 
-  # ── 2 & 3. Build + Snyk ──────────────────────────────────
+  # ── 2 & 3. Build + Snyk ────────────────────────────────
   build-snyk:
     needs: sonarqube
     uses: WellNest-Project/template-ci/.github/workflows/template-build-snyk.yml@main
