@@ -3,22 +3,29 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN npm run build --if-present
 
-FROM node:20-alpine
+FROM node:20-alpine AS production
 WORKDIR /app
-ENV NODE_ENV=production
 
-# Update Alpine packages + upgrade npm to latest to fix bundled vulnerabilities
 RUN apk update && \
     apk upgrade && \
-    rm -rf /var/cache/apk/* && \
     npm install -g npm@latest && \
-    npm cache clean --force
+    npm cache clean --force && \
+    rm -rf /var/cache/apk/*
 
-COPY --from=builder /app/node_modules ./node_modules
+RUN addgroup -S wellnest && adduser -S wellnest -G wellnest
+
+COPY package*.json ./
+RUN npm install --omit=dev
+
 COPY --from=builder /app/src ./src
-COPY --from=builder /app/package*.json ./
+RUN chown -R wellnest:wellnest /app
+
+USER wellnest
 
 EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:3001/health || exit 1
+
 CMD ["node", "src/index.js"]
