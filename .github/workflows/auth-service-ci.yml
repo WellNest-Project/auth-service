@@ -1,0 +1,92 @@
+name: "WellNest — Auth Service CI/CD"
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  # ── 1. SonarQube ─────────────────────────────────────────
+  sonarqube:
+    uses: WellNest-Project/template-ci/.github/workflows/template-sonarqube.yml@main
+    with:
+      service_name: "wellnest-auth"
+      service_path: "."
+      sonar_project_key: "wellnest-auth"
+    secrets:
+      SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+      SONARQUBE_URL: ${{ secrets.SONARQUBE_URL }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+
+  # ── 2 & 3. Build + Snyk ──────────────────────────────────
+  build-snyk:
+    needs: sonarqube
+    uses: WellNest-Project/template-ci/.github/workflows/template-build-snyk.yml@main
+    with:
+      service_name: "wellnest-auth"
+      service_path: "."
+      node_version: "20"
+    secrets:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+
+  # ── 4,5,6. Docker Build + Trivy + Push ───────────────────
+  docker:
+    needs: build-snyk
+    if: github.event_name == 'push'
+    uses: WellNest-Project/template-ci/.github/workflows/template-docker.yml@main
+    with:
+      service_name: "wellnest-auth"
+      service_path: "."
+      docker_image_name: "wellnest-auth-service"
+      environment: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+
+  # ── Approval Gate (prod only) ─────────────────────────────
+  approval:
+    needs: docker
+    if: github.ref_name == 'main' && github.event_name == 'push'
+    uses: WellNest-Project/template-ci/.github/workflows/template-approval-gate.yml@main
+    with:
+      service_name: "wellnest-auth"
+      image_tag: ${{ needs.docker.outputs.image_tag }}
+    secrets:
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+
+  # ── 7. CD — Update manifest repo ─────────────────────────
+  cd:
+    needs: [docker, approval]
+    if: |
+      always() &&
+      needs.docker.result == 'success' &&
+      (
+        github.ref_name == 'develop' ||
+        (github.ref_name == 'main' && needs.approval.result == 'success')
+      )
+    uses: WellNest-Project/template-ci/.github/workflows/template-cd.yml@main
+    with:
+      service_name: "wellnest-auth"
+      values_key: "auth"
+      image_tag: ${{ needs.docker.outputs.image_tag }}
+      environment: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+    secrets:
+      MANIFEST_REPO_PAT: ${{ secrets.MANIFEST_REPO_PAT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
