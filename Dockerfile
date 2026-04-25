@@ -9,9 +9,12 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Update Alpine packages + upgrade npm to latest to fix bundled vulnerabilities
 RUN apk update && \
     apk upgrade && \
-    rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/* && \
+    npm install -g npm@latest && \
+    npm cache clean --force
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
