@@ -59,7 +59,7 @@ jobs:
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 
-  # ── Approval Gate (prod only) ─────────────────────────────
+  # ── Approval Gate (prod only) ───────────────────────────
   approval:
     needs: docker
     if: github.ref_name == 'main' && github.event_name == 'push'
