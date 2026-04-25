@@ -14,7 +14,7 @@ permissions:
 
 jobs:
 
-  # ── 1. SonarQube ─────────────────────────────────────────
+  # ── 1. SonarQube ───────────────────────────────────────
   sonarqube:
     uses: WellNest-Project/template-ci/.github/workflows/template-sonarqube.yml@main
     with:
